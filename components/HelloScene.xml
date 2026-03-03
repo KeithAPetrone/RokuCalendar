@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <component name="HelloScene" extends="Scene">
   <children>
-    <!-- Background -->
-    <Rectangle width="1920" height="1080" color="0x1a1a2eff" />
+    <!-- Background Slideshow -->
+    <Poster id="backgroundPoster" width="1920" height="1080" loadDisplayMode="scaleToFill" opacity="0.6" />
+    
+    <!-- Original Background (Dark overlay) -->
+    <Rectangle width="1920" height="1080" color="0x000000ff" opacity="0.4" />
     
     <!-- Header -->
     <Rectangle width="1920" height="80" color="0x2d2d5cff" />

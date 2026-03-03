@@ -7,38 +7,40 @@ sub init()
     m.daysGroup = m.top.findNode("daysGroup")
 
     if m.calendarGroup <> invalid then
-        deviceInfo = CreateObject("roDeviceInfo")
-        displaySize = deviceInfo.GetDisplaySize()
-        screenW = displaySize.w
-        screenH = displaySize.h
-
-        if screenW <= 0 then screenW = 1280
-        if screenH <= 0 then screenH = 720
-
-        baseScale = screenW / 1920.0
-        scale = baseScale * 0.85
+        ' ... (scaling code) ...
         m.calendarGroup.scale = [scale, scale]
         m.calendarGroup.translation = [20, 110]
-
+        
+        m.backgroundPoster = m.top.findNode("backgroundPoster")
+        
         createCalendarGrid()
-        ' Mock data for now: show March 2026 starting on Sunday (index 0)
-        populateCalendar(0, 31, {
-            "2": "Mtg",
-            "3": "Dentist",
-            "4": "Gym",
-            "6": "Conf",
-            "9": "Doctor",
-            "11": "Project",
-            "13": "Game",
-            "14": "Birthday",
-            "17": "Dentist",
-            "19": "Gym",
-            "21": "Trip",
-            "23": "Work",
-            "26": "Meeting",
-            "28": "Dinner",
-            "29": "Easter"
-        })
+        startMicrosoftAuth()
+    end if
+end sub
+
+sub startMicrosoftAuth()
+    m.microsoftTask = CreateObject("roSGNode", "MicrosoftTask")
+    m.microsoftTask.observeField("authResult", "onAuthResult")
+    m.microsoftTask.observeField("status", "onAuthStatusChange")
+    m.microsoftTask.status = "AUTHENTICATE"
+    m.microsoftTask.control = "RUN"
+end sub
+
+sub onAuthResult()
+    result = m.microsoftTask.authResult
+    if result.user_code <> invalid then
+        ' This is where we show the code! 
+        m.top.findNode("monthLabel").text = "Login: " + result.verification_uri
+        m.top.findNode("todayLabel").text = "Enter Code: " + result.user_code
+    end if
+end sub
+
+sub onAuthStatusChange()
+    if m.microsoftTask.status = "SUCCESS" then
+        m.top.findNode("monthLabel").text = "Logged In!"
+        ' Now we can fetch photos
+        m.microsoftTask.status = "FETCH_PHOTOS"
+        m.microsoftTask.control = "RUN"
     end if
 end sub
 
