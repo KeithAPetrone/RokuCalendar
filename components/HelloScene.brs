@@ -4,14 +4,13 @@ sub init()
     m.calendarGroup = m.top.findNode("calendarGroup")
     m.daysGroup = m.top.findNode("daysGroup")
     m.backgroundPoster = m.top.findNode("backgroundPoster")
+    m.statusLabel = m.top.findNode("statusLabel")
     
-    ' Overlay nodes
     m.loginOverlay = m.top.findNode("loginOverlay")
     m.loginTitle = m.top.findNode("loginTitle")
     m.loginUrl = m.top.findNode("loginUrl")
     m.loginCode = m.top.findNode("loginCode")
     
-    ' Data storage
     m.googleEvents = {}
     m.bgRects = []
     m.dayLabels = []
@@ -22,11 +21,13 @@ sub init()
         setupCurrentMonth()
     end if
 
-    ' Scaling
     deviceInfo = CreateObject("roDeviceInfo")
-    screenW = deviceInfo.GetDisplaySize().w
+    displaySize = deviceInfo.GetDisplaySize()
+    screenW = displaySize.w
     if screenW <= 0 then screenW = 1280
-    scale = (screenW / 1920.0) * 1.1
+    
+    baseScale = screenW / 1920.0
+    scale = baseScale * 1.1
     
     if m.calendarGroup <> invalid then
         m.calendarGroup.scale = [scale, scale]
@@ -35,9 +36,8 @@ sub init()
         m.calendarGroup.translation = [centerX, 110]
     end if
     
-    ' Start background tasks after a delay
     m.authTimer = m.top.createChild("Timer")
-    m.authTimer.duration = 1.0 ' 1 second delay
+    m.authTimer.duration = 1.0
     m.authTimer.repeat = false
     m.authTimer.observeField("fire", "onAuthTimerFire")
     m.authTimer.control = "START"
@@ -48,7 +48,6 @@ sub onAuthTimerFire()
     startGoogleAuth()
 end sub
 
-' --- Grid & Month ---
 sub setupCurrentMonth()
     now = CreateObject("roDateTime")
     m.currentYear = now.GetYear()
@@ -57,26 +56,28 @@ sub setupCurrentMonth()
     months = ["January", "February", "March", "April", "May", "June", 
               "July", "August", "September", "October", "November", "December"]
     
-    monthLabel = m.top.findNode("monthLabel")
-    if monthLabel <> invalid then
-        monthLabel.text = months[m.currentMonth - 1] + " " + m.currentYear.toStr()
+    monthLbl = m.top.findNode("monthLabel")
+    if monthLbl <> invalid then
+        monthLbl.text = months[m.currentMonth - 1] + " " + m.currentYear.toStr()
     end if
     
-    firstOfMonthStr = m.currentYear.toStr() + "-"
-    if m.currentMonth < 10 then firstOfMonthStr += "0"
-    firstOfMonthStr += m.currentMonth.toStr() + "-01T12:00:00Z"
+    mMonthStr = m.currentMonth.toStr()
+    if m.currentMonth < 10 then mMonthStr = "0" + mMonthStr
     
+    firstOfMonthStr = m.currentYear.toStr() + "-" + mMonthStr + "-01T12:00:00Z"
     dt = CreateObject("roDateTime")
     dt.FromISO8601String(firstOfMonthStr)
-    m.startDayIndex = dt.GetDayOfWeek() ' 0=Sun, 6=Sat (integer)
-    if type(m.startDayIndex) <> "Integer" then m.startDayIndex = 0
     
+    m.startDayIndex = dt.GetDayOfWeek()
     m.daysInMonth = 31
+    
     if m.currentMonth = 4 or m.currentMonth = 6 or m.currentMonth = 9 or m.currentMonth = 11 then
         m.daysInMonth = 30
     else if m.currentMonth = 2 then
         m.daysInMonth = 28
-        if (m.currentYear MOD 4 = 0 and m.currentYear MOD 100 <> 0) or (m.currentYear MOD 400 = 0) then m.daysInMonth = 29
+        if (m.currentYear MOD 4 = 0 and m.currentYear MOD 100 <> 0) or (m.currentYear MOD 400 = 0) then
+            m.daysInMonth = 29
+        end if
     end if
     
     refreshUI()
@@ -84,20 +85,35 @@ end sub
 
 sub createCalendarGrid()
     if m.daysGroup = invalid then return
+    
     m.daysGroup.removeChildrenIndex(m.daysGroup.getChildCount(), 0)
+    m.bgRects = []
+    m.dayLabels = []
+    m.evtLabels = []
+    
     for i = 0 to 41
         col = i MOD 7
         row = i \ 7
         x = col * 210
         y = row * 130
+        
         rect = m.daysGroup.createChild("Rectangle")
-        rect.width = 200 : rect.height = 120 : rect.color = "#00000000" : rect.translation = [x, y]
+        rect.width = 200
+        rect.height = 120
+        rect.color = "#00000000"
+        rect.translation = [x, y]
         m.bgRects.push(rect)
+        
         dayLbl = m.daysGroup.createChild("Label")
-        dayLbl.translation = [x + 8, y + 10] : dayLbl.font = "font:MediumBoldSystemFont"
+        dayLbl.translation = [x + 8, y + 10]
+        dayLbl.font = "font:MediumBoldSystemFont"
         m.dayLabels.push(dayLbl)
+        
         evtLbl = m.daysGroup.createChild("Label")
-        evtLbl.translation = [x, y + 30] : evtLbl.width = 192 : evtLbl.horizAlign = "right" : evtLbl.font = "font:SmallSystemFont"
+        evtLbl.translation = [x, y + 30]
+        evtLbl.width = 192
+        evtLbl.horizAlign = "right"
+        evtLbl.font = "font:SmallSystemFont"
         m.evtLabels.push(evtLbl)
     end for
 end sub
@@ -105,34 +121,34 @@ end sub
 sub refreshUI()
     allEvents = m.googleEvents
     
-    ' Ensure startDayIndex is an integer for calculation
     startIdx = 0
-    if type(m.startDayIndex) = "Integer" then
-        startIdx = m.startDayIndex
-    else if type(m.startDayIndex) = "String" then
-        startIdx = m.startDayIndex.toInt()
+    if m.startDayIndex <> invalid then
+        if type(m.startDayIndex) = "Integer" then
+            startIdx = m.startDayIndex
+        else if type(m.startDayIndex) = "String" then
+            startIdx = m.startDayIndex.toInt()
+        end if
     end if
     
     for i = 0 to 41
-        if m.bgRects[i] <> invalid then m.bgRects[i].color = "#00000000"
-        if m.dayLabels[i] <> invalid then m.dayLabels[i].text = ""
-        if m.evtLabels[i] <> invalid then m.evtLabels[i].text = ""
+        m.bgRects[i].color = "#00000000"
+        m.dayLabels[i].text = ""
+        m.evtLabels[i].text = ""
     end for
     
     for day = 1 to m.daysInMonth
         idx = startIdx + day - 1
-        if idx <= 41 then
-            if m.bgRects[idx] <> invalid then m.bgRects[idx].color = "#3d3d7cff"
-            if m.dayLabels[idx] <> invalid then m.dayLabels[idx].text = day.toStr()
+        if idx >= 0 and idx <= 41 then
+            m.bgRects[idx].color = "#3d3d7cff"
+            m.dayLabels[idx].text = day.toStr()
             dayStr = day.toStr()
-            if allEvents.doesExist(dayStr) and m.evtLabels[idx] <> invalid then 
+            if allEvents.doesExist(dayStr) then
                 m.evtLabels[idx].text = allEvents[dayStr]
             end if
         end if
     end for
 end sub
 
-' --- Dropbox Auth ---
 sub startDropboxAuth()
     m.dbTask = CreateObject("roSGNode", "DropboxTask")
     if m.dbTask <> invalid then
@@ -153,16 +169,14 @@ sub onDBAuthResult()
 end sub
 
 sub onDBStatusChange()
-    if m.dbTask = invalid then return
+    if m.statusLabel <> invalid then m.statusLabel.text = "DB: " + m.dbTask.status
     if m.dbTask.status = "SUCCESS" then
         if m.loginOverlay <> invalid then m.loginOverlay.visible = false
         m.dbTask.status = "FETCH_PHOTOS"
-        m.dbTask.control = "RUN"
         checkPendingLogins()
     end if
 end sub
 
-' --- Google Auth ---
 sub startGoogleAuth()
     m.googleTask = CreateObject("roSGNode", "GoogleTask")
     if m.googleTask <> invalid then
@@ -180,7 +194,7 @@ end sub
 
 sub checkPendingLogins()
     if m.dbTask <> invalid and m.dbTask.status = "AUTHENTICATE" and m.loginOverlay <> invalid and m.loginOverlay.visible then return
-
+    
     if m.googleTask <> invalid and m.googleTask.status = "AUTHENTICATE" then
         res = m.googleTask.authResult
         if res <> invalid and res.user_code <> invalid then
@@ -190,11 +204,10 @@ sub checkPendingLogins()
 end sub
 
 sub onGoogleStatusChange()
-    if m.googleTask = invalid then return
+    if m.statusLabel <> invalid then m.statusLabel.text = "GOOG: " + m.googleTask.status
     if m.googleTask.status = "SUCCESS" then
         if m.loginOverlay <> invalid then m.loginOverlay.visible = false
         m.googleTask.status = "FETCH_CALENDAR"
-        m.googleTask.control = "RUN"
     end if
 end sub
 
@@ -205,7 +218,6 @@ sub onGoogleCalendarData()
     end if
 end sub
 
-' --- Overlay UI ---
 sub showLoginOverlay(title as string, url as string, code as string)
     if m.loginTitle <> invalid then m.loginTitle.text = "Login to " + title
     if m.loginUrl <> invalid then m.loginUrl.text = "Visit: " + url
@@ -219,7 +231,8 @@ sub onPhotoUrls()
         m.photoIndex = 0
         if m.slideshowTimer = invalid then
             m.slideshowTimer = m.top.createChild("Timer")
-            m.slideshowTimer.repeat = true : m.slideshowTimer.duration = 30
+            m.slideshowTimer.repeat = true
+            m.slideshowTimer.duration = 30
             m.slideshowTimer.observeField("fire", "nextPhoto")
         end if
         m.slideshowTimer.control = "START"
@@ -228,9 +241,11 @@ sub onPhotoUrls()
 end sub
 
 sub nextPhoto()
-    if m.photoUrls <> invalid and m.photoUrls.count() > 0 and m.backgroundPoster <> invalid then
-        m.backgroundPoster.uri = m.photoUrls[m.photoIndex]
-        m.photoIndex = (m.photoIndex + 1) MOD m.photoUrls.count()
+    if m.photoUrls <> invalid and m.photoUrls.count() > 0 then
+        if m.backgroundPoster <> invalid then
+            m.backgroundPoster.uri = m.photoUrls[m.photoIndex]
+            m.photoIndex = (m.photoIndex + 1) MOD m.photoUrls.count()
+        end if
     end if
 end sub
 

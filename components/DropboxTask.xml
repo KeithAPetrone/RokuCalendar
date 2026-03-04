@@ -5,5 +5,6 @@
     <field id="status" type="string" />
     <field id="photoUrls" type="array" />
   </interface>
+  <script type="text/brightscript" uri="pkg:/source/config.brs" />
   <script type="text/brightscript" uri="pkg:/components/DropboxTask.brs" />
 </component>

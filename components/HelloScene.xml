@@ -1,20 +1,14 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <component name="HelloScene" extends="Scene">
   <children>
-    <!-- Background Slideshow -->
     <Poster id="backgroundPoster" width="1920" height="1080" loadDisplayMode="scaleToFill" opacity="0.6" />
-    
-    <!-- Original Background (Dark overlay) -->
     <Rectangle width="1920" height="1080" color="0x000000ff" opacity="0.4" />
-    
-    <!-- Header -->
     <Rectangle width="1920" height="80" color="0x2d2d5cff" />
-    <Label id="monthLabel" text="March 2026" translation="[40, 20]" font="font:LargeBoldSystemFont" color="0xffffffff" />
-    <Label id="todayLabel" text="Today: 03/02" translation="[40, 55]" font="font:SmallSystemFont" color="0xccccccff" />
+    <Label id="monthLabel" text="Loading..." translation="[40, 20]" font="font:LargeBoldSystemFont" color="0xffffffff" />
+    <Label id="todayLabel" text="" translation="[40, 55]" font="font:SmallSystemFont" color="0xccccccff" />
+    <Label id="statusLabel" text="" translation="[880, 20]" width="1000" horizAlign="right" font="font:SmallSystemFont" color="0xaaaaaaff" />
     
-    <!-- Calendar Grid Container -->
     <Group id="calendarGroup" translation="[20, 110]" scale="[0.85, 0.85]">
-      <!-- Day headers -->
       <Label text="Sun" translation="[0, 0]" font="font:MediumBoldSystemFont" color="0xffaa00ff" width="200" height="40" />
       <Label text="Mon" translation="[210, 0]" font="font:MediumBoldSystemFont" color="0xffffffff" width="200" height="40" />
       <Label text="Tue" translation="[420, 0]" font="font:MediumBoldSystemFont" color="0xffffffff" width="200" height="40" />
@@ -22,22 +16,21 @@
       <Label text="Thu" translation="[840, 0]" font="font:MediumBoldSystemFont" color="0xffffffff" width="200" height="40" />
       <Label text="Fri" translation="[1050, 0]" font="font:MediumBoldSystemFont" color="0xffffffff" width="200" height="40" />
       <Label text="Sat" translation="[1260, 0]" font="font:MediumBoldSystemFont" color="0xffaa00ff" width="200" height="40" />
-      
-      <!-- Days will be generated here -->
       <Group id="daysGroup" translation="[0, 50]" />
     </Group>
 
-    <!-- Login Overlay -->
     <Group id="loginOverlay" visible="false">
       <Rectangle width="1920" height="1080" color="0x000000dd" />
       <Group translation="[660, 300]">
         <Rectangle width="600" height="400" color="0x2d2d5cff" />
         <Label id="loginTitle" text="Login Required" translation="[0, 40]" width="600" horizAlign="center" font="font:LargeBoldSystemFont" />
-        <Label id="loginUrl" text="Visit: microsoft.com/devicelogin" translation="[0, 120]" width="600" horizAlign="center" font="font:MediumSystemFont" />
+        <Label id="loginUrl" text="" translation="[0, 120]" width="600" horizAlign="center" font="font:MediumSystemFont" />
         <Label id="loginCode" text="XXXX-XXXX" translation="[0, 200]" width="600" horizAlign="center" font="font:LargeBoldSystemFont" color="0x00ff00ff" />
         <Label text="Press BACK to cancel" translation="[0, 320]" width="600" horizAlign="center" font="font:SmallSystemFont" color="0xaaaaaaff" />
       </Group>
     </Group>
   </children>
+  
+  <script type="text/brightscript" uri="pkg:/source/config.brs" />
   <script type="text/brightscript" uri="pkg:/components/HelloScene.brs" />
 </component>
