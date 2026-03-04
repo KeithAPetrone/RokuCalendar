@@ -110,50 +110,49 @@ sub fetchGoogleCalendar()
         return
     end if
     
-    ' 1. Get List of all calendars
-    calListUrl = "https://www.googleapis.com/calendar/v3/users/me/calendarList"
     xfer = CreateObject("roUrlTransfer")
-    xfer.SetUrl(calListUrl) : xfer.SetCertificatesFile("common:/certs/ca-bundle.crt")
+    xfer.SetUrl("https://www.googleapis.com/calendar/v3/users/me/calendarList")
+    xfer.SetCertificatesFile("common:/certs/ca-bundle.crt")
     xfer.AddHeader("Authorization", "Bearer " + m.accessToken)
     
     resp = xfer.GetToString()
     if resp = "" then return
-    
     jsonList = ParseJson(resp)
     if jsonList = invalid or jsonList.items = invalid then return
     
-    ' 2. Fetch events for EVERY calendar
     now = CreateObject("roDateTime")
     thisMonth = now.GetMonth()
+    thisYear = now.GetYear()
+    
     monthStr = thisMonth.toStr()
     if thisMonth < 10 then monthStr = "0" + monthStr
-    timeMin = now.GetYear().toStr() + "-" + monthStr + "-01T00:00:00Z"
+    
+    timeMin = thisYear.toStr() + "-" + monthStr + "-01T00:00:00Z"
     
     allEventsAA = {}
-    
     for each cal in jsonList.items
-        calId = cal.id
-        url = "https://www.googleapis.com/calendar/v3/calendars/" + xfer.UrlEncode(calId) + "/events"
+        url = "https://www.googleapis.com/calendar/v3/calendars/" + xfer.UrlEncode(cal.id) + "/events"
         url += "?timeMin=" + timeMin + "&singleEvents=true&orderBy=startTime&maxResults=50"
-        
         xfer.SetUrl(url)
         eventResp = xfer.GetToString()
         if eventResp <> "" then
             eventsJson = ParseJson(eventResp)
             if eventsJson <> invalid and eventsJson.items <> invalid then
                 for each item in eventsJson.items
-                    dayPart = invalid
-                    if item.start <> invalid and item.start.date <> invalid then
-                        dayPart = item.start.date
-                    else if item.start <> invalid and item.start.dateTime <> invalid then
-                        dayPart = item.start.dateTime.split("T")[0]
+                    dtStr = invalid
+                    if item.start <> invalid and item.start.dateTime <> invalid then
+                        dtStr = item.start.dateTime
+                    else if item.start <> invalid and item.start.date <> invalid then
+                        dtStr = item.start.date + "T12:00:00Z"
                     end if
                     
-                    if dayPart <> invalid then
-                        daySegs = dayPart.split("-")
-                        if daySegs.count() >= 3 and Val(daySegs[1]) = thisMonth then
-                            dayNum = Val(daySegs[2]).toStr()
-                            ' Merge multiple events with commas
+                    if dtStr <> invalid then
+                        eventDate = CreateObject("roDateTime")
+                        eventDate.FromISO8601String(dtStr)
+                        eventDate.ToLocalTime()
+                        
+                        if eventDate.GetMonth() = thisMonth then
+                            dayNum = eventDate.GetDayOfMonth().toStr()
                             if allEventsAA.doesExist(dayNum) then
                                 allEventsAA[dayNum] += ", " + item.summary
                             else

@@ -21,10 +21,14 @@ sub handleStatus(status as string)
     if status = "AUTHENTICATE" then
         getDeviceCode()
     else if status = "FETCH_PHOTOS" then
-        fetchDropboxPhotos()
+        fetchDropboxPhotoList()
+    else if status.left(11) = "GET_LINK_FOR" then
+        path = status.split("|")[1]
+        getFreshLink(path)
     end if
 end sub
 
+' --- Persistence ---
 function loadSavedTokens() as boolean
     sec = CreateObject("roRegistrySection", "Authentication")
     if sec.Exists("db_refresh_token") then
@@ -49,6 +53,7 @@ sub saveTokens(json as object)
     sec.Flush()
 end sub
 
+' --- OAuth Flow ---
 sub getDeviceCode()
     url = "https://api.dropboxapi.com/oauth2/device/authorize"
     xfer = CreateObject("roUrlTransfer")
@@ -59,18 +64,14 @@ sub getDeviceCode()
     xfer.SetMessagePort(port)
     if xfer.AsyncPostFromString(params) then
         msg = wait(10000, port)
-        if type(msg) = "roUrlEvent" then
-            if msg.GetResponseCode() = 200 then
-                body = msg.GetString()
-                if body <> "" then
-                    json = ParseJson(body)
-                    if json <> invalid then
-                        m.top.authResult = json
-                        pollForToken(json.device_code, json.interval)
-                    end if
+        if type(msg) = "roUrlEvent" and msg.GetResponseCode() = 200 then
+            body = msg.GetString()
+            if body <> "" then
+                json = ParseJson(body)
+                if json <> invalid then
+                    m.top.authResult = json
+                    pollForToken(json.device_code, json.interval)
                 end if
-            else
-                m.top.status = "DB_AUTH_ERR_" + msg.GetResponseCode().toStr()
             end if
         end if
     end if
@@ -107,14 +108,11 @@ sub pollForToken(deviceCode as string, interval as integer)
     end while
 end sub
 
-sub fetchDropboxPhotos()
-    if m.accessToken = invalid then 
-        m.top.status = "DB_FETCH_NO_TOKEN"
-        return
-    end if
+' --- Data Fetching ---
+sub fetchDropboxPhotoList()
+    if m.accessToken = invalid then return
     cfg = GetConfig()
     path = cfg.slideshow.folderName
-    ' Clean path
     if path.left(1) <> "/" then path = "/" + path
     
     url = "https://api.dropboxapi.com/2/files/list_folder"
@@ -128,38 +126,25 @@ sub fetchDropboxPhotos()
     xfer.SetMessagePort(port)
     if xfer.AsyncPostFromString(FormatJson(body)) then
         msg = wait(10000, port)
-        if type(msg) = "roUrlEvent" then
-            code = msg.GetResponseCode()
-            if code = 200 then
-                body = msg.GetString()
-                if body <> "" then
-                    json = ParseJson(body)
-                    if json <> invalid and json.entries <> invalid then
-                        urls = []
-                        for each entry in json.entries
-                            ' Check extension for images
-                            fname = entry.name.toLower()
-                            if entry[".tag"] = "file" and (fname.instr(".jpg") >= 0 or fname.instr(".png") >= 0 or fname.instr(".jpeg") >= 0) then
-                                link = getTemporaryLink(entry.path_lower)
-                                if link <> "" then urls.push(link)
-                            end if
-                        end for
-                        if urls.count() > 0 then
-                            m.top.photoUrls = urls
-                            m.top.status = "DB_FETCH_OK_" + urls.count().toStr()
-                        else
-                            m.top.status = "DB_FETCH_EMPTY"
-                        end if
+        if type(msg) = "roUrlEvent" and msg.GetResponseCode() = 200 then
+            json = ParseJson(msg.GetString())
+            if json <> invalid and json.entries <> invalid then
+                paths = []
+                for each entry in json.entries
+                    fname = entry.name.toLower()
+                    if entry[".tag"] = "file" and (fname.instr(".jpg") >= 0 or fname.instr(".png") >= 0 or fname.instr(".jpeg") >= 0) then
+                        paths.push(entry.path_lower)
                     end if
-                end if
-            else
-                m.top.status = "DB_FETCH_ERR_" + code.toStr()
+                end for
+                ' Return the list of PATHS instead of LINKS
+                m.top.photoUrls = paths
+                m.top.status = "DB_LIST_OK_" + paths.count().toStr()
             end if
         end if
     end if
 end sub
 
-function getTemporaryLink(path as string) as string
+sub getFreshLink(path as string)
     url = "https://api.dropboxapi.com/2/files/get_temporary_link"
     xfer = CreateObject("roUrlTransfer")
     xfer.SetUrl(url) : xfer.SetCertificatesFile("common:/certs/ca-bundle.crt")
@@ -171,12 +156,13 @@ function getTemporaryLink(path as string) as string
     if xfer.AsyncPostFromString(FormatJson(body)) then
         msg = wait(5000, port)
         if type(msg) = "roUrlEvent" and msg.GetResponseCode() = 200 then
-            body = msg.GetString()
-            if body <> "" then
-                json = ParseJson(body)
-                if json <> invalid then return json.link
+            json = ParseJson(msg.GetString())
+            if json <> invalid then
+                ' We update the photoUrls array with JUST THIS ONE fresh link
+                ' so HelloScene can pick it up
+                m.top.photoUrls = [json.link]
+                m.top.status = "DB_LINK_READY"
             end if
         end if
     end if
-    return ""
-end function
+end sub
