@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<component name="GoogleTask" extends="Task" functionName="runTask">
+  <interface>
+    <field id="authResult" type="assocarray" />
+    <field id="status" type="string" />
+    <field id="calendarData" type="assocarray" />
+  </interface>
+  <script type="text/brightscript" uri="pkg:/components/GoogleTask.brs" />
+</component>

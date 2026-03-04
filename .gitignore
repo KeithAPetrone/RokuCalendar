@@ -1,0 +1,10 @@
+# Roku Build files
+*.zip
+out/
+
+'# Configuration (Sensitive)
+source/config.brs
+
+'# OS files
+.DS_Store
+Thumbs.db

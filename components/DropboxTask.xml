@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<component name="MicrosoftTask" extends="Task">
+<component name="DropboxTask" extends="Task" functionName="runTask">
   <interface>
     <field id="authResult" type="assocarray" />
     <field id="status" type="string" />
     <field id="photoUrls" type="array" />
   </interface>
-  <script type="text/brightscript" uri="pkg:/components/MicrosoftTask.brs" />
+  <script type="text/brightscript" uri="pkg:/components/DropboxTask.brs" />
 </component>
