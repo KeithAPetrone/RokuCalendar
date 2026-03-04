@@ -113,12 +113,17 @@ sub fetchDropboxPhotos()
         return
     end if
     cfg = GetConfig()
+    path = cfg.slideshow.folderName
+    ' Clean path
+    if path.left(1) <> "/" then path = "/" + path
+    
     url = "https://api.dropboxapi.com/2/files/list_folder"
     xfer = CreateObject("roUrlTransfer")
     xfer.SetUrl(url) : xfer.SetCertificatesFile("common:/certs/ca-bundle.crt")
     xfer.AddHeader("Authorization", "Bearer " + m.accessToken)
     xfer.AddHeader("Content-Type", "application/json")
-    body = { "path": cfg.slideshow.folderName, "recursive": false }
+    
+    body = { "path": path, "recursive": false }
     port = CreateObject("roMessagePort")
     xfer.SetMessagePort(port)
     if xfer.AsyncPostFromString(FormatJson(body)) then
@@ -132,7 +137,9 @@ sub fetchDropboxPhotos()
                     if json <> invalid and json.entries <> invalid then
                         urls = []
                         for each entry in json.entries
-                            if entry[".tag"] = "file" then
+                            ' Check extension for images
+                            fname = entry.name.toLower()
+                            if entry[".tag"] = "file" and (fname.instr(".jpg") >= 0 or fname.instr(".png") >= 0 or fname.instr(".jpeg") >= 0) then
                                 link = getTemporaryLink(entry.path_lower)
                                 if link <> "" then urls.push(link)
                             end if

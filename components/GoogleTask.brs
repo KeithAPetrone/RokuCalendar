@@ -60,18 +60,14 @@ sub getDeviceCode()
     xfer.SetMessagePort(port)
     if xfer.AsyncPostFromString(params) then
         msg = wait(10000, port)
-        if type(msg) = "roUrlEvent" then
-            if msg.GetResponseCode() = 200 then
-                body = msg.GetString()
-                if body <> "" then
-                    json = ParseJson(body)
-                    if json <> invalid then
-                        m.top.authResult = json
-                        pollForToken(json.device_code, json.interval)
-                    end if
+        if type(msg) = "roUrlEvent" and msg.GetResponseCode() = 200 then
+            body = msg.GetString()
+            if body <> "" then
+                json = ParseJson(body)
+                if json <> invalid then
+                    m.top.authResult = json
+                    pollForToken(json.device_code, json.interval)
                 end if
-            else
-                m.top.status = "GOOG_AUTH_ERR_" + msg.GetResponseCode().toStr()
             end if
         end if
     end if
@@ -113,46 +109,63 @@ sub fetchGoogleCalendar()
         m.top.status = "GOOG_FETCH_NO_TOKEN"
         return
     end if
-    now = CreateObject("roDateTime")
-    timeMin = now.toISOString()
-    url = "https://www.googleapis.com/calendar/v3/calendars/primary/events?timeMin=" + timeMin + "&singleEvents=true&orderBy=startTime"
+    
+    ' 1. Get List of all calendars
+    calListUrl = "https://www.googleapis.com/calendar/v3/users/me/calendarList"
     xfer = CreateObject("roUrlTransfer")
-    xfer.SetUrl(url) : xfer.SetCertificatesFile("common:/certs/ca-bundle.crt")
+    xfer.SetUrl(calListUrl) : xfer.SetCertificatesFile("common:/certs/ca-bundle.crt")
     xfer.AddHeader("Authorization", "Bearer " + m.accessToken)
-    port = CreateObject("roMessagePort")
-    xfer.SetMessagePort(port)
-    if xfer.AsyncGetToString() then
-        msg = wait(10000, port)
-        if type(msg) = "roUrlEvent" then
-            code = msg.GetResponseCode()
-            if code = 200 then
-                body = msg.GetString()
-                if body <> "" then
-                    json = ParseJson(body)
-                    if json <> invalid and json.items <> invalid then
-                        eventsAA = {}
-                        for each item in json.items
-                            dayPart = invalid
-                            if item.start <> invalid and item.start.date <> invalid then
-                                dayPart = item.start.date
-                            else if item.start <> invalid and item.start.dateTime <> invalid then
-                                dayPart = item.start.dateTime.split("T")[0]
-                            end if
-                            if dayPart <> invalid then
-                                daySegments = dayPart.split("-")
-                                if daySegments.count() >= 3 then
-                                    dayNum = Val(daySegments[2]).toStr()
-                                    if not eventsAA.doesExist(dayNum) then eventsAA[dayNum] = item.summary
-                                end if
-                            end if
-                        end for
-                        m.top.calendarData = eventsAA
-                        m.top.status = "GOOG_FETCH_OK_" + json.items.count().toStr()
+    
+    resp = xfer.GetToString()
+    if resp = "" then return
+    
+    jsonList = ParseJson(resp)
+    if jsonList = invalid or jsonList.items = invalid then return
+    
+    ' 2. Fetch events for EVERY calendar
+    now = CreateObject("roDateTime")
+    thisMonth = now.GetMonth()
+    monthStr = thisMonth.toStr()
+    if thisMonth < 10 then monthStr = "0" + monthStr
+    timeMin = now.GetYear().toStr() + "-" + monthStr + "-01T00:00:00Z"
+    
+    allEventsAA = {}
+    
+    for each cal in jsonList.items
+        calId = cal.id
+        url = "https://www.googleapis.com/calendar/v3/calendars/" + xfer.UrlEncode(calId) + "/events"
+        url += "?timeMin=" + timeMin + "&singleEvents=true&orderBy=startTime&maxResults=50"
+        
+        xfer.SetUrl(url)
+        eventResp = xfer.GetToString()
+        if eventResp <> "" then
+            eventsJson = ParseJson(eventResp)
+            if eventsJson <> invalid and eventsJson.items <> invalid then
+                for each item in eventsJson.items
+                    dayPart = invalid
+                    if item.start <> invalid and item.start.date <> invalid then
+                        dayPart = item.start.date
+                    else if item.start <> invalid and item.start.dateTime <> invalid then
+                        dayPart = item.start.dateTime.split("T")[0]
                     end if
-                end if
-            else
-                m.top.status = "GOOG_FETCH_ERR_" + code.toStr()
+                    
+                    if dayPart <> invalid then
+                        daySegs = dayPart.split("-")
+                        if daySegs.count() >= 3 and Val(daySegs[1]) = thisMonth then
+                            dayNum = Val(daySegs[2]).toStr()
+                            ' Merge multiple events with commas
+                            if allEventsAA.doesExist(dayNum) then
+                                allEventsAA[dayNum] += ", " + item.summary
+                            else
+                                allEventsAA[dayNum] = item.summary
+                            end if
+                        end if
+                    end if
+                end for
             end if
         end if
-    end if
+    next
+    
+    m.top.calendarData = allEventsAA
+    m.top.status = "GOOG_FETCH_OK"
 end sub
