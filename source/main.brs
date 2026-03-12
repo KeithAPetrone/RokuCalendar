@@ -1,5 +1,14 @@
 sub Main()
     print "Starting RokuCalendar"
+    
+    ' Attempt to disable screensaver on main thread
+    deviceInfo = CreateObject("roDeviceInfo")
+    try
+        deviceInfo.EnableScreensaver(false)
+    catch e
+        print "EnableScreensaver not supported or failed: "; e.message
+    end try
+    
     port = CreateObject("roMessagePort")
     screen = CreateObject("roSGScreen")
     screen.SetMessagePort(port)
