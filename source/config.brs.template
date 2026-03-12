@@ -1,0 +1,22 @@
+function GetConfig() as Object
+    return {
+        "dropbox": {
+            "appKey": "YOUR_DROPBOX_APP_KEY",
+            "appSecret": "YOUR_DROPBOX_APP_SECRET",
+            "refreshToken": "" ' Run get_dropbox_token.ps1 to get this
+        },
+        "google": {
+            "clientId": "YOUR_GOOGLE_CLIENT_ID",
+            "clientSecret": "YOUR_GOOGLE_CLIENT_SECRET"
+        },
+        "weather": {
+            "latitude": "", ' e.g. "40.7608" (Leave empty for GeoIP)
+            "longitude": "", ' e.g. "-111.8910"
+            "city": ""      ' e.g. "Salt Lake City"
+        },
+        "slideshow": {
+            "interval": 30,
+            "folderName": "/RokuPhotos" ' Folder in your Dropbox root
+        }
+    }
+end function
